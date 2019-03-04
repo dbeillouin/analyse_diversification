@@ -2,20 +2,21 @@
 # Méta-synthèse sur la divsersification des cultures: code d'analyse
 # travail initial: Octobre 2018, reprise Février 2019
 
-### ANALYSE DES DONNEES TOUT TYE DE DIVERSIFICATION ENSEMBLE ######
+### ANALYSE DES DONNEES TOUT TYPE DE DIVERSIFICATION ENSEMBLE ######
 
 
 # Initialisation --------------------------------------------------------------------------------------------------
-# setwd
-setwd("~/Documents/shinyapp/")
-# Load packages
-x<-c("magrittr", "tidyverse", "ggplot2","lme4","metafor","broom")
-lapply(x, require, character.only = TRUE)
-
-# load Data
-source('~/Documents/analyse_diversification/1.Description_donnee.R', echo=TRUE)
+  # setwd
+   setwd("~/Documents/analyse_diversification/analyse_diversification")
   
-RATIO2<-merge(RATIO2, QUAL)
+  # Load packages
+    x<-c("magrittr", "tidyverse", "ggplot2","lme4","metafor","broom","ggpubr")
+    lapply(x, require, character.only = TRUE)
+  
+  # load Data
+    source('~/Documents/analyse_diversification/1.Description_donnee.R', echo=TRUE)
+    
+    RATIO2<-merge(RATIO2, QUAL)
 
 #RATIO2 %>%filter(vi>0.2)
 
@@ -110,13 +111,18 @@ RATIO2<-merge(RATIO2, QUAL)
             # augmented_rma_lm   = map(model_rma_lm, augment))
     
     
+    res<- rma(ES, vi, mods= ~DIVERS-1,data=RATIO2, method="FE")
+    res<-    rma(ES, vi,slab= ID, data=RATIO2, method="REML")
+    funnel(res)
+    
+    
     ESSAI <-RATIO2 %>% filter(Sub_Cat_Output=="Soil quality")
     
     ### Sans considérer les poids ######
     rma(ES, vi, mods= ~DIVERS-1,data=ESSAI, method="FE")
 
     
-  #### Analyse teh results ##########
+  #### Analyse the results ##########
     
     res_lm  <- lm %>% 
              unnest(tidied_lm, .drop = TRUE) %>%
@@ -291,3 +297,35 @@ RATIO2<-merge(RATIO2, QUAL)
     #lmer%>%   unnest(glanced_rma_NUM, .drop = TRUE)
     
 
+    #######
+    ### GRAPHIQUES
+    
+    # type forest plot classique
+    DATA<- res %>% filter(method=="lmer_ID")
+    ggplot(data=DATA)+ 
+      geom_point(aes(x=reorder(Sub_Cat_Output,estimate), y= estimate))+
+      geom_errorbar(aes(x=Sub_Cat_Output, ymin=conf.low, ymax=conf.high), width=.1) +
+       theme_bw()+
+      geom_hline(yintercept=0, linetype=2)+
+      theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+      labs(title="ALL diversification strategies together", x= "Studied Output", y= "Effect size")
+
+    
+    # type flower Power 
+    library(tidyverse)
+
+    ESSAI<- RATIO2 %>% select(ES,Sub_Cat_Output)
+    ESSAI2<-DATA %>%  select(estimate,Sub_Cat_Output,conf.low,conf.high)
+    names(ESSAI2)[1]<-"ES"
+    ESSAI3<-RATIO2 %>% group_by(Sub_Cat_Output)  %>%  count()
+    
+    ggplot(ESSAI, aes(x = Sub_Cat_Output, y = ES)) +
+      geom_hline(yintercept=c(-1,0,1),col=c("gray","black","gray")) + 
+      geom_text(data=ESSAI3,aes(Sub_Cat_Output,1.3,label=n, group=Sub_Cat_Output), position=position_dodge(width=1), size=4)+
+      geom_violin(aes(fill = Sub_Cat_Output), alpha=0.2) +
+      geom_point(data = ESSAI2, color = "red")+
+      geom_errorbar(data = ESSAI2,aes(ymin=conf.low, ymax=conf.high), colour="black", width=.1)+
+      coord_polar(theta = "x")+
+      theme_pubr()
+    
+    
